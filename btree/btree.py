@@ -4,11 +4,13 @@ import unittest
 
 INVALID_KEY = -1
 
-class BTreeNode():
-  def __init__(self, t, isLeaf):
+class BTreeNode(object):
+  def __init__(self, tree, isLeaf):
     self.num = 0
     self.leaf = isLeaf
-    self.t = t
+    self.tree = tree
+    self.t = tree.t
+    t = self.t
 
     self.keys = []
     self.datas = []
@@ -56,7 +58,7 @@ class BTreeNode():
     t = self.t
 
     # allocate a new node which is going to store (t-1) keys of y 
-    z = BTreeNode(t, y.isLeaf())
+    z = type(self)(self.tree, y.isLeaf())
     z.setNum(t - 1)
 
     # move y.keys[t:2t-1] to z.keys[0:t-1]
@@ -114,6 +116,7 @@ class BTreeNode():
           i += 1
       self.getChild(i + 1).insertNonFull(key, data)
   
+  # find the location of the key, return index and found
   def _findKey(self, key):
     i = 0
     while (i < self.getNum() and self.getKey(i) < key):
@@ -361,7 +364,9 @@ class BTreeNode():
       child.printDebug()
     pass
 
-class BTree():
+class BTree(object):
+  NODE = LEAD = BTreeNode
+
   def __init__(self, degree):
     self.t = degree
     self.root = None
@@ -371,7 +376,7 @@ class BTree():
 
   def insert(self, key, data):
     if self._isEmpty(): # if tree is empty 
-      root = BTreeNode(self.t, True)
+      root = self.NODE(self, True)
       root.setKeyAndData(0, (key, data))
       root.setNum(1)
       self.root = root
@@ -380,7 +385,7 @@ class BTree():
 
       if root.isFull():  # if root is full,then grows in height
         # allocate a new internal node
-        s = BTreeNode(self.t, False)
+        s = self.NODE(self, False)
         
         # make old root as the first child of new root
         s.setChild(0, root)
