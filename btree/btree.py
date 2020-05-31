@@ -11,9 +11,11 @@ class BTreeNode():
     self.t = t
 
     self.keys = []
+    self.datas = []
     for i in range(2 * t - 1):
       self.keys.append(INVALID_KEY)
-    
+      self.datas.append(INVALID_KEY)
+
     self.children = []    
     for i in range(2 * t):
       self.children.append(None)
@@ -27,8 +29,13 @@ class BTreeNode():
   def setNum(self, num):
     self.num = num
 
-  def setKey(self, index, key):
+  def setKeyAndData(self, index, packed):
+    key, data = packed
     self.keys[index] = key
+    self.datas[index] = data
+
+  def getKeyAndData(self, index):
+    return self.keys[index],self.datas[index]
 
   def getKey(self, index):
     return self.keys[index]
@@ -54,9 +61,7 @@ class BTreeNode():
 
     # move y.keys[t:2t-1] to z.keys[0:t-1]
     for j in range(0, t - 1):
-      z.setKey(j, y.getKey(j + t))
-      # reset y's moved key
-      #y.setKey(j + t, INVALID_KEY)
+      z.setKeyAndData(j, y.getKeyAndData(j + t))
 
     if not y.isLeaf():  # if y is not a leaf
       # move y.children[t:2t] to z.children[0:t]
@@ -76,25 +81,25 @@ class BTreeNode():
 
     # move key to create space for new key
     for j in range(self.getNum() - 1, i - 1, -1):
-      self.setKey(j + 1, self.getKey(j))
+      self.setKeyAndData(j + 1, self.getKeyAndData(j))
     
-    self.setKey(i,y.getKey(t - 1))
+    self.setKeyAndData(i,y.getKeyAndData(t - 1))
 
     # increment the number
     self.setNum(self.getNum() + 1)
 
   # when called node must be not full
-  def insertNonFull(self, key):
+  def insertNonFull(self, key, data):
     i = self.getNum() - 1
 
     if self.isLeaf(): # if is leaf
       # 1.find the location of the new key
       # 2.move all greater keys to one place ahead
       while i >= 0 and (self.getKey(i) == INVALID_KEY or self.getKey(i) > key):
-        self.setKey(i + 1, self.getKey(i))
+        self.setKeyAndData(i + 1, self.getKeyAndData(i))
         i -= 1
       # insert new key
-      self.setKey(i + 1, key)
+      self.setKeyAndData(i + 1, (key, data))
       self.setNum(self.getNum() + 1)
     else:             # if is internal node
       # find the location of the new key
@@ -107,7 +112,7 @@ class BTreeNode():
         self.splitChild(i + 1, y)
         if self.getKey(i + 1) < key:
           i += 1
-      self.getChild(i + 1).insertNonFull(key)
+      self.getChild(i + 1).insertNonFull(key, data)
   
   def _findKey(self, key):
     i = 0
@@ -118,7 +123,7 @@ class BTreeNode():
   # remove the idx-th key from this node,which is a leaf
   def _removeFromLeaf(self, idx):
     for i in range(idx + 1, self.getNum()):
-      self.setKey(i - 1, self.getKey(i))
+      self.setKeyAndData(i - 1, self.getKeyAndData(i))
     self.setNum(self.getNum() - 1)
   
   # remove the idx-th key from this node,which is a internal node
@@ -130,8 +135,8 @@ class BTreeNode():
       # find the predecessor 'pred' of k in the subtree rooted at 
       # C[idx]. Replace k by pred. Recursively delete pred 
       # in C[idx]       
-      pred = self._getPred(idx)
-      self.setKey(idx, pred)
+      pred,data = self._getPred(idx)
+      self.setKeyAndData(idx, (pred, data))
       self.getChild(idx).remove(pred)   
     elif self.getChild(idx + 1).getNum() >= self.t:
       # If the child C[idx] has less that t keys, examine C[idx+1]. 
@@ -139,8 +144,8 @@ class BTreeNode():
       # the subtree rooted at C[idx+1] 
       # Replace k by succ 
       # Recursively delete succ in C[idx+1]          
-      succ = self._getSucc(idx)
-      self.setKey(idx, succ)
+      succ,data = self._getSucc(idx)
+      self.setKeyAndData(idx, (succ, data))
       self.getChild(idx + 1).remove(succ)
     else:
       # If both C[idx] and C[idx+1] has less that t keys,merge k and all of C[idx+1] 
@@ -159,11 +164,11 @@ class BTreeNode():
 
     # Pulling a key from the current node and inserting it into (t-1)th 
     # position of C[idx] 
-    child.setKey(t - 1, self.getKey(idx))
+    child.setKeyAndData(t - 1, self.getKeyAndData(idx))
 
     # Copying the keys from C[idx+1] to C[idx] at the end 
     for i in range(0, sibling.getNum()):
-      child.setKey(i + t, sibling.getKey(i))
+      child.setKeyAndData(i + t, sibling.getKeyAndData(i))
     
     # Copying the child pointers from C[idx+1] to C[idx] 
     if not child.isLeaf():
@@ -173,7 +178,7 @@ class BTreeNode():
     # Moving all keys after idx in the current node one step before - 
     # to fill the gap created by moving keys[idx] to C[idx]     
     for i in range(idx + 1, self.getNum()):
-      self.setKey(i - 1, self.getKey(i))
+      self.setKeyAndData(i - 1, self.getKeyAndData(i))
 
     # Moving the child pointers after (idx+1) in the current node one 
     # step before 
@@ -192,7 +197,7 @@ class BTreeNode():
       cur = cur.getChild(cur.getNum())
     
     # Return the last key of the leaf
-    return cur.getKey(cur.getNum() - 1)
+    return cur.getKeyAndData(cur.getNum() - 1)
 
   # get successor of keys[idx] 
   def _getSucc(self, idx):
@@ -202,7 +207,7 @@ class BTreeNode():
       cur = cur.getChild(0)
     
     # Return the first key of the leaf
-    return cur.getKey(0)
+    return cur.getKeyAndData(0)
 
   def _fill(self, idx):
     t = self.t
@@ -234,7 +239,7 @@ class BTreeNode():
 
     # Moving all key in C[idx] one step ahead 
     for i in range(child.getNum() - 1, -1, -1):
-      child.setKey(i + 1, child.getKey(i))
+      child.setKeyAndData(i + 1, child.getKeyAndData(i))
     
     # If C[idx] is not a leaf, move all its child pointers one step ahead 
     if not child.isLeaf():
@@ -242,7 +247,7 @@ class BTreeNode():
         child.setChild(i + 1, child.getChild(i))   
 
     # Setting child's first key equal to keys[idx-1] from the current node 
-    child.setKey(0, self.getKey(idx - 1))
+    child.setKeyAndData(0, self.getKeyAndData(idx - 1))
 
     # Moving sibling's last child as C[idx]'s first child 
     if not child.isLeaf():
@@ -250,7 +255,7 @@ class BTreeNode():
 
     # Moving the key from the sibling to the parent 
     # This reduces the number of keys in the sibling 
-    self.setKey(idx - 1, sibling.getKey(sibling.getNum() - 1))
+    self.setKeyAndData(idx - 1, sibling.getKeyAndData(sibling.getNum() - 1))
 
     child.setNum(child.getNum() + 1)
     sibling.setNum(sibling.getNum() - 1)
@@ -261,18 +266,18 @@ class BTreeNode():
     sibling = self.getChild(idx + 1)
 
     # keys[idx] is inserted as the last key in C[idx] 
-    child.setKey(child.getNum(), self.getKey(idx))
+    child.setKeyAndData(child.getNum(), self.getKeyAndData(idx))
     
     # Sibling's first child is inserted as the last child into C[idx]
     if not child.isLeaf():
       child.setChild(child.getNum() + 1, sibling.getChild(0)) 
 
     # The first key from sibling is inserted into keys[idx] 
-    self.setKey(idx, sibling.getKey(0))
+    self.setKeyAndData(idx, sibling.getKeyAndData(0))
 
     # Moving all keys in sibling one step behind 
     for i in range(1, sibling.getNum()):
-      sibling.setKey(i - 1, sibling.getKey(i))
+      sibling.setKeyAndData(i - 1, sibling.getKeyAndData(i))
  
     # Moving the child pointers one step behind 
     if not sibling.isLeaf():
@@ -321,7 +326,7 @@ class BTreeNode():
     i,found = self._findKey(key)
 
     if found: # if key present in this node
-      return self
+      return self.datas[i]
 
     if self.isLeaf(): # if key not present in this node and is a leaf
       return None
@@ -364,10 +369,10 @@ class BTree():
   def _isEmpty(self):
     return self.root == None
 
-  def insert(self, key):
+  def insert(self, key, data):
     if self._isEmpty(): # if tree is empty 
       root = BTreeNode(self.t, True)
-      root.setKey(0, key)
+      root.setKeyAndData(0, (key, data))
       root.setNum(1)
       self.root = root
     else:             # if tree is not empty
@@ -388,13 +393,13 @@ class BTree():
         if s.getKey(0) != INVALID_KEY and s.getKey(0) < key:
           i = 1
 
-        s.getChild(i).insertNonFull(key)
+        s.getChild(i).insertNonFull(key, data)
 
         # change root
         self.root = s
       else:        
         # if root is not full,call insertNonFull for root
-        root.insertNonFull(key)
+        root.insertNonFull(key, data)
   
   # remove the key,return True or False
   def remove(self, key):
@@ -440,7 +445,6 @@ class BTree():
     for i in range(node.getNum() + 1):
       child = children[i]
       if not child:
-        flag = True
         continue
 
       key = None
@@ -495,7 +499,7 @@ class BTreeTests(unittest.TestCase):
     for i in range(0,1000):
       item = random.randint(1,100000)
       l.append(item)
-      bt.insert(item)
+      bt.insert(item, item)
 
     self.assertTrue(bt.checkAttr())
 
@@ -511,7 +515,7 @@ class BTreeTests(unittest.TestCase):
     for i in range(0,1000):
       item = random.randint(1,100000)
       l.append(item)
-      bt.insert(item)
+      bt.insert(item, item)
 
     index = random.randint(1,100000) % len(l)
     item = l[index]
@@ -531,12 +535,14 @@ class BTreeTests(unittest.TestCase):
     for i in range(0,1000):
       item = random.randint(1,100000)
       l.append(item)
-      bt.insert(item)
+      bt.insert(item, item)
     
     index = random.randint(1,100000) % len(l)
     item = l[index]
 
-    self.assertTrue(bt.search(item) != None)
+    ret = bt.search(item)
+    self.assertTrue(ret != None)
+    self.assertEqual(ret,item)
 
 if __name__ == '__main__':
     unittest.main()
