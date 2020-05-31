@@ -317,6 +317,17 @@ class BTreeNode():
       else:
         return self.getChild(i).remove(key)
 
+  def search(self, key):
+    i,found = self._findKey(key)
+
+    if found: # if key present in this node
+      return self
+
+    if self.isLeaf(): # if key not present in this node and is a leaf
+      return None
+    # else search key in child
+    return self.getChild(i).search(key)
+
   def traverse(self, result):
     # iterate over all keys
     for i in range(self.getNum()):
@@ -400,6 +411,11 @@ class BTree():
 
     return ret
 
+  def search(self, key):
+    if self._isEmpty(): # if btree is empty
+      return None
+    return self.root.search(key)
+
   def printDebug(self):
     self.root.printDebug()
     print "\n\n"
@@ -477,9 +493,8 @@ class BTreeTests(unittest.TestCase):
     bt = BTree(20)
     l = []
     for i in range(0,1000):
-      l.append(random.randint(1,100000))
-
-    for i, item in enumerate(l):
+      item = random.randint(1,100000)
+      l.append(item)
       bt.insert(item)
 
     self.assertTrue(bt.checkAttr())
@@ -494,9 +509,8 @@ class BTreeTests(unittest.TestCase):
     bt = BTree(20)
     l = []
     for i in range(0,1000):
-      l.append(random.randint(1,100000))
-
-    for i, item in enumerate(l):
+      item = random.randint(1,100000)
+      l.append(item)
       bt.insert(item)
 
     index = random.randint(1,100000) % len(l)
@@ -511,6 +525,19 @@ class BTreeTests(unittest.TestCase):
     for i in range(len(result)):
         self.assertEqual(result[i], l[i])
   
+  def test_search(self):
+    bt = BTree(20)
+    l = []
+    for i in range(0,1000):
+      item = random.randint(1,100000)
+      l.append(item)
+      bt.insert(item)
+    
+    index = random.randint(1,100000) % len(l)
+    item = l[index]
+
+    self.assertTrue(bt.search(item) != None)
+
 if __name__ == '__main__':
     unittest.main()
 
