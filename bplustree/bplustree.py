@@ -53,7 +53,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
     self.children[index] = child
 
   def isFull(self):
-    return self.num == self.t * 2 - 1
+    return self.num == (self.t * 2 - 1)
 
   def _findPosition(self, key):
     i = 0
@@ -87,7 +87,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
   # return split,key,left,right
   def insert(self, key, value):
     if self.isFull(): # node is full,split it
-      threshold = self.t - 1
+      threshold = self.t
       sibling = BPlusTreeNode(self.tree, self.parent)
       sibling.setNum(self.getNum() - threshold)
       # copy [t:2t-1] to sibling
@@ -95,13 +95,13 @@ class BPlusTreeNode(BPlusTreeBaseNode):
         sibling.setKeyAndChild(i, self.getKeyAndChild(threshold+i))
       
       sibling.setChild(sibling.getNum(), self.getChild(self.getNum()))
-      self.setNum(threshold)
+      self.setNum(threshold - 1)
 
-      return_key = self.getKey(threshold)
+      return_key = self.getKey(threshold - 1)
       left = self
       right = sibling
 
-      # insert in the appropriate sibling
+      # insert in the appropriate node
       if key < return_key:
         self._insertNonFull(self,key,value)
       else:
@@ -128,7 +128,7 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
       self.datas.append(INVALID_KEY)
 
   def isFull(self):
-    return self.num == self.t * 2 - 1
+    return self.num == (self.t * 2 - 1)
 
   def isLeaf(self):
     return True
@@ -164,17 +164,19 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     # find the pos to insert
     pos = self._findPosition(key)
     if self.isFull(): # leaf is full,split it
-      threshhold = self.t
+      threshold = self.t
       sibling = BPlusTreeLeaf(self.tree, self.parent)
-      sibling.setNum(self.getNum() - threshhold)
+      sibling.setNum(self.getNum() - threshold)
       # copy [t:2t-1] to sibling
       for i in range(0, sibling.getNum()):
-        sibling.setKeyAndData(i, self.getKeyAndData(threshhold+i))
-      self.setNum(threshhold)
-      if pos < threshhold:
+        sibling.setKeyAndData(i, self.getKeyAndData(threshold+i))
+      self.setNum(threshold)
+      if pos < threshold:
+        # insert to right
         self._insertNonFull(self,key,value,pos)
       else:
-        self._insertNonFull(sibling,key,value,pos - threshhold)
+        # insert to left
+        self._insertNonFull(sibling,key,value,pos - threshold)
       return True,sibling.getKey(0),self,sibling
     else:
       # leaf is not full
@@ -188,6 +190,8 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
 
 class BPlusTree(object):
   def __init__(self,degree):
+    assert(degree >= 2)
+
     self.t = degree
     self.root = BPlusTreeLeaf(self, None)
   
@@ -204,23 +208,22 @@ class BPlusTree(object):
     root.setChild(1,right)
     self.root = root
 
-  # traverse a btree, return mid-order traverse list
+  # traverse a btree, return from left to right leaf's key list
   def traverse(self):
     return self.root.traverse([])
 
 # unit tests for BPlusTree
 class BPlusTreeTests(unittest.TestCase):
   def test_additions(self):    
-    bt = BPlusTree(2)
+    bt = BPlusTree(20)
     l = []
-    for i in range(0,20):
-      #item = random.randint(1,100000)
+    for i in range(0,500):
+      item = random.randint(1,100000)
       item = i
       l.append(item)
       bt.insert(item, item)
     result = bt.traverse()
     l.sort()
-    print result
     for i in range(len(result)):
       self.assertEqual(result[i], l[i])    
 
