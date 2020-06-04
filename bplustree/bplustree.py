@@ -12,6 +12,9 @@ class BPlusTreeBaseNode(object):
     self.keys = []
     self.parent = parent
 
+  def isFull(self):
+    return self.num == (self.t * 2 - 1)
+
   def setNum(self, num):
     self.num = num
   
@@ -52,12 +55,9 @@ class BPlusTreeNode(BPlusTreeBaseNode):
     self.keys[index] = key
     self.children[index] = child
 
-  def isFull(self):
-    return self.num == (self.t * 2 - 1)
-
   def _findPosition(self, key):
     i = 0
-    while (i < self.getNum() and (self.getKey(i) < key or self.getKey(i) == key)):
+    while (i < self.getNum() and (self.getKey(i) <= key)):
       i += 1
     return i
 
@@ -112,6 +112,13 @@ class BPlusTreeNode(BPlusTreeBaseNode):
       self._insertNonFull(self,key,value)
       return False,INVALID_KEY,None,None
       
+  def search(self, key):
+    pos = self._findPosition(key)    
+    child = self.getChild(pos)
+    if child == None:
+      return None
+    return child.search(key)
+
   def traverse(self, result):
     for i in range(0, self.getNum() + 1):
       child = self.getChild(i)
@@ -126,9 +133,6 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     for i in range(2 * t - 1):
       self.keys.append(INVALID_KEY)
       self.datas.append(INVALID_KEY)
-
-  def isFull(self):
-    return self.num == (self.t * 2 - 1)
 
   def isLeaf(self):
     return True
@@ -183,6 +187,14 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
       self._insertNonFull(self,key,value,pos)
       return False,INVALID_KEY,None,None
 
+  def search(self, key):
+    pos = self._findPosition(key)
+    if pos == self.getNum():
+      return None
+    if self.getKey(pos) == key:
+      return self.datas[pos]
+    return None
+
   def traverse(self, result):
     for i in range(0, self.getNum()):
       result.append(self.getKey(i))
@@ -208,6 +220,9 @@ class BPlusTree(object):
     root.setChild(1,right)
     self.root = root
 
+  def search(self, key):
+    return self.root.search(key)
+
   # traverse a btree, return from left to right leaf's key list
   def traverse(self):
     return self.root.traverse([])
@@ -223,9 +238,24 @@ class BPlusTreeTests(unittest.TestCase):
       l.append(item)
       bt.insert(item, item)
     result = bt.traverse()
+    print result
     l.sort()
     for i in range(len(result)):
       self.assertEqual(result[i], l[i])    
+
+  def test_search(self):    
+    bt = BPlusTree(2)
+    l = []
+    for i in range(0,20):
+      item = random.randint(1,100000)
+      item = i
+      l.append(item)
+      bt.insert(item, item)
+    result = bt.traverse()
+    print result
+    l.sort()
+    for i in range(len(result)):
+      self.assertEqual(bt.search(l[i]), l[i])   
 
 if __name__ == '__main__':
     unittest.main()
