@@ -63,7 +63,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
 
   # insert (key,,value) into nonfull node
   def _insertNonFull(self, node, key, value):
-    pos = self._findPosition(key)
+    pos = node._findPosition(key)
 
     split,key,left,right = node.getChild(pos).insert(key,value)
     if not split:
@@ -113,7 +113,9 @@ class BPlusTreeNode(BPlusTreeBaseNode):
       return False,INVALID_KEY,None,None
       
   def search(self, key):
-    pos = self._findPosition(key)    
+    pos = self._findPosition(key)
+    if pos == len(self.children):
+      return None
     child = self.getChild(pos)
     if child == None:
       return None
@@ -231,29 +233,40 @@ class BPlusTree(object):
 class BPlusTreeTests(unittest.TestCase):
   def test_additions(self):    
     bt = BPlusTree(20)
-    l = []
-    for i in range(0,500):
-      item = random.randint(1,100000)
-      item = i
-      l.append(item)
-      bt.insert(item, item)
-    result = bt.traverse()
-    print result
-    l.sort()
-    for i in range(len(result)):
-      self.assertEqual(result[i], l[i])    
 
-  def test_search(self):    
-    bt = BPlusTree(2)
     l = []
-    for i in range(0,20):
+    inserted = {}
+    for i in range(0,5000):
       item = random.randint(1,100000)
-      item = i
       l.append(item)
       bt.insert(item, item)
+
+    # unique insert key
+    newList = []
+    for i in l:
+      if i in inserted:
+        continue
+      inserted[i] = True
+      newList.append(i)
+    newList.sort()
+
     result = bt.traverse()
-    print result
-    l.sort()
+
+    self.assertEqual(len(result), len(newList))    
+    for i in range(len(result)):
+      self.assertEqual(result[i], newList[i])    
+
+  def test_search(self):
+    bt = BPlusTree(20)
+
+    l = []
+    for i in range(0,5000):
+      item = random.randint(1,100000)
+      l.append(item)
+      bt.insert(item, item)
+
+    result = bt.traverse()
+
     for i in range(len(result)):
       self.assertEqual(bt.search(l[i]), l[i])   
 
