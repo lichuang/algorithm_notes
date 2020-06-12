@@ -1,4 +1,5 @@
 # -*- coding: UTF-8 -*-
+# Btree的实现代码，详细见：https://www.codedump.info/post/20200609-btree-1/
 import random
 import unittest
 
@@ -49,12 +50,12 @@ class BTreeNode(object):
   def getChild(self, index):
     return self.children[index]
 
-  def _isFull(self):
+  def isFull(self):
     return self.num == 2 * self.t - 1
 
   # split the child y of this node,y must be full when called
   def splitChild(self, i, y):
-    assert(y._isFull())
+    assert(y.isFull())
 
     t = self.t
 
@@ -92,7 +93,7 @@ class BTreeNode(object):
     self.setNum(self.getNum() + 1)
 
   # when called node must be not full
-  def _insertNonFull(self, key, data):
+  def insertNonFull(self, key, data):
     i = self.getNum() - 1
 
     if self.isLeaf(): # if is leaf
@@ -111,27 +112,27 @@ class BTreeNode(object):
       
       # if the child is full,split it
       y = self.getChild(i + 1)
-      if y._isFull():
+      if y.isFull():
         self.splitChild(i + 1, y)
         if self.getKey(i + 1) < key:
           i += 1
-      self.getChild(i + 1)._insertNonFull(key, data)
+      self.getChild(i + 1).insertNonFull(key, data)
   
   # find the location of the key, return index and found
-  def _findKey(self, key):
+  def findKey(self, key):
     i = 0
     while (i < self.getNum() and self.getKey(i) < key):
       i += 1
     return i, i < self.getNum() and self.getKey(i) == key
 
   # remove the idx-th key from this node,which is a leaf
-  def _removeFromLeaf(self, idx):
+  def removeFromLeaf(self, idx):
     for i in range(idx + 1, self.getNum()):
       self.setKeyAndData(i - 1, self.getKeyAndData(i))
     self.setNum(self.getNum() - 1)
   
   # remove the idx-th key from this node,which is a internal node
-  def _removeFromNode(self, idx):
+  def removeFromNode(self, idx):
     key = self.getKey(idx)
 
     if self.getChild(idx).getNum() >= self.t:
@@ -139,7 +140,7 @@ class BTreeNode(object):
       # find the predecessor 'pred' of k in the subtree rooted at 
       # C[idx]. Replace k by pred. Recursively delete pred 
       # in C[idx]       
-      pred,data = self._getPred(idx)
+      pred,data = self.getPred(idx)
       self.setKeyAndData(idx, (pred, data))
       self.getChild(idx).remove(pred)   
     elif self.getChild(idx + 1).getNum() >= self.t:
@@ -148,7 +149,7 @@ class BTreeNode(object):
       # the subtree rooted at C[idx+1] 
       # Replace k by succ 
       # Recursively delete succ in C[idx+1]          
-      succ,data = self._getSucc(idx)
+      succ,data = self.getSucc(idx)
       self.setKeyAndData(idx, (succ, data))
       self.getChild(idx + 1).remove(succ)
     else:
@@ -156,12 +157,12 @@ class BTreeNode(object):
       # into C[idx] 
       # Now C[idx] contains 2t-1 keys 
       # Free C[idx+1] and recursively delete k from C[idx]    
-      self._merge(idx)
+      self.merge(idx)
       self.getChild(idx).remove(key)
   
   # merge C[idx] with C[idx+1] 
   # C[idx+1] is freed after merging   
-  def _merge(self, idx):
+  def merge(self, idx):
     t = self.t
     child = self.getChild(idx)
     sibling = self.getChild(idx+1)
@@ -194,7 +195,7 @@ class BTreeNode(object):
     self.setNum(self.getNum() - 1)
 
   # get predecessor of keys[idx] 
-  def _getPred(self, idx):
+  def getPred(self, idx):
     # Keep moving to the right most node until we reach a leaf
     cur = self.getChild(idx)
     while not cur.isLeaf():
@@ -204,7 +205,7 @@ class BTreeNode(object):
     return cur.getKeyAndData(cur.getNum() - 1)
 
   # get successor of keys[idx] 
-  def _getSucc(self, idx):
+  def getSucc(self, idx):
     # Keep moving the left most node starting from C[idx+1] until we reach a leaf
     cur = self.getChild(idx + 1)
     while not cur.isLeaf():
@@ -213,27 +214,27 @@ class BTreeNode(object):
     # Return the first key of the leaf
     return cur.getKeyAndData(0)
 
-  def _fill(self, idx):
+  def rebalance(self, idx):
     t = self.t
     if idx != 0 and self.getChild(idx - 1).getNum() >= t:
       # If the previous child(C[idx-1]) has more than t-1 keys, borrow a key 
       # from that child
-      self._borrowFromPrev(idx)
+      self.borrowFromPrev(idx)
     if idx != self.getNum() and self.getChild(idx + 1).getNum() >= t:
       # If the next child(C[idx+1]) has more than t-1 keys, borrow a key 
       # from that child
-      self._borrowFromNext(idx)
+      self.borrowFromNext(idx)
     else:
       # Merge C[idx] with its sibling 
       # If C[idx] is the last child, merge it with with its previous sibling 
       # Otherwise merge it with its next sibling
       if idx != self.getNum():
-        self._merge(idx)
+        self.merge(idx)
       else:
-        self._merge(idx - 1)
+        self.merge(idx - 1)
 
   # borrow a key from C[idx-1] and insert it into C[idx] 
-  def _borrowFromPrev(self, idx):
+  def borrowFromPrev(self, idx): 
     child = self.getChild(idx)
     sibling = self.getChild(idx - 1)
 
@@ -265,7 +266,7 @@ class BTreeNode(object):
     sibling.setNum(sibling.getNum() - 1)
 
   # borrow a key from the C[idx+1] and place it in C[idx]  
-  def _borrowFromNext(self, idx):
+  def borrowFromNext(self, idx):
     child = self.getChild(idx)
     sibling = self.getChild(idx + 1)
 
@@ -293,16 +294,16 @@ class BTreeNode(object):
     sibling.setNum(sibling.getNum() - 1)
 
   def remove(self, key):
-    i,found = self._findKey(key)
+    i,found = self.findKey(key)
 
     if found: # if key present in this node
       if self.isLeaf():
-        self._removeFromLeaf(i)
+        self.removeFromLeaf(i)
       else:
-        self._removeFromNode(i)
+        self.removeFromNode(i)
       return True
     else:
-      # if node is leaf and key not present in it,return False
+      # if node is leaf and key is not present in it,return False
       if self.isLeaf():
         return False
 
@@ -313,21 +314,20 @@ class BTreeNode(object):
       if i == self.getNum():
         flag = True
 
-      # If the child where the key is supposed to exist has less that t keys, 
-      # we fill that child 
+      # If the child where the key is supposed to exist has less that t keys, rebalance that child 
       if self.getChild(i).getNum() < self.t:
-        self._fill(i)
+        self.rebalance(i)
       
       # If the last child has been merged, it must have merged with the previous 
-      # child and so we recurse on the (idx-1)th child. Else, we recurse on the 
-      # (idx)th child which now has atleast t keys 
+      # child and so we recurse on the (i-1)-th child. Else, we recurse on the 
+      # i-th child which now has at least t keys 
       if flag and i > self.getNum():
         return self.getChild(i - 1).remove(key)
       else:
         return self.getChild(i).remove(key)
 
   def search(self, key):
-    i,found = self._findKey(key)
+    i,found = self.findKey(key)
 
     if found: # if key present in this node
       return self.datas[i]
@@ -366,7 +366,7 @@ class BTree(object):
     else:             # if tree is not empty
       root = self.root
 
-      if root._isFull():  # if root is full,then grows in height
+      if root.isFull():  # if root is full,then grows in height
         # allocate a new internal node
         s = BTreeNode(self, False)
         
@@ -381,13 +381,13 @@ class BTree(object):
         if s.getKey(0) != INVALID_KEY and s.getKey(0) < key:
           i = 1
 
-        s.getChild(i)._insertNonFull(key, data)
+        s.getChild(i).insertNonFull(key, data)
 
         # change root
         self.root = s
       else:        
-        # if root is not full,call _insertNonFull for root
-        root._insertNonFull(key, data)
+        # if root is not full,call insertNonFull for root
+        root.insertNonFull(key, data)
   
   # remove the key,return True or False
   def remove(self, key):
