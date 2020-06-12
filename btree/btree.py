@@ -287,7 +287,7 @@ class BTreeNode(object):
     # Moving the child pointers one step behind 
     if not sibling.isLeaf():
       for i in range(1, sibling.getNum() + 1):
-        sibling.setChild(i - 1, sibling.setChild(i))  
+        sibling.setChild(i - 1, sibling.getChild(i))  
     
     # Increasing and decreasing the key count of C[idx] and C[idx+1] respectively 
     child.setNum(child.getNum() + 1)
