@@ -11,15 +11,38 @@ class BPlusTreeBaseNode(object):
     self.t = tree.t
     self.keys = []
     self.parent = parent
+    self.next = None
+    self.prev = None
 
   def isFull(self):
     return self.num == (self.t * 2 - 1)
+
+  def isEnough(self):
+    return self.num >= (self.t - 1)
+
+  def setNext(self, next):
+    self.next = next
+  
+  def getNext(self):
+    return self.next
+
+  def setPrev(self, prev):
+    self.prev = prev
+  
+  def getPrev(self):
+    return self.prev
 
   def setNum(self, num):
     self.num = num
   
   def getNum(self):
     return self.num
+
+  def setParent(self, parent):
+    self.parent = parent
+
+  def getParent(self):
+    return self.parent
 
   def getKey(self, index):
     return self.keys[index]
@@ -88,24 +111,27 @@ class BPlusTreeNode(BPlusTreeBaseNode):
   def insert(self, key, value):
     if self.isFull(): # node is full,split it
       threshold = self.t
-      sibling = BPlusTreeNode(self.tree, self.parent)
-      sibling.setNum(self.getNum() - threshold)
-      # copy [t:2t-1] to sibling
-      for i in range(0, sibling.getNum()):
-        sibling.setKeyAndChild(i, self.getKeyAndChild(threshold+i))
+      right = BPlusTreeNode(self.tree, self.parent)
+
+      self.setNext(right)
+      right.setPrev(self)
       
-      sibling.setChild(sibling.getNum(), self.getChild(self.getNum()))
+      right.setNum(self.getNum() - threshold)
+      # copy [t:2t-1] to sibling
+      for i in range(0, right.getNum()):
+        right.setKeyAndChild(i, self.getKeyAndChild(threshold+i))
+      
+      right.setChild(right.getNum(), self.getChild(self.getNum()))
       self.setNum(threshold - 1)
 
       return_key = self.getKey(threshold - 1)
       left = self
-      right = sibling
 
       # insert in the appropriate node
       if key < return_key:
         self._insertNonFull(self,key,value)
       else:
-        self._insertNonFull(sibling,key,value)
+        self._insertNonFull(right,key,value)
 
       return True,return_key,left,right
     else:
@@ -171,19 +197,23 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     pos = self._findPosition(key)
     if self.isFull(): # leaf is full,split it
       threshold = self.t
-      sibling = BPlusTreeLeaf(self.tree, self.parent)
-      sibling.setNum(self.getNum() - threshold)
+      right = BPlusTreeLeaf(self.tree, self.parent)
+
+      self.setNext(right)
+      right.setPrev(self)
+
+      right.setNum(self.getNum() - threshold)
       # copy [t:2t-1] to sibling
-      for i in range(0, sibling.getNum()):
-        sibling.setKeyAndData(i, self.getKeyAndData(threshold+i))
+      for i in range(0, right.getNum()):
+        right.setKeyAndData(i, self.getKeyAndData(threshold+i))
       self.setNum(threshold)
       if pos < threshold:
         # insert to right
         self._insertNonFull(self,key,value,pos)
       else:
         # insert to left
-        self._insertNonFull(sibling,key,value,pos - threshold)
-      return True,sibling.getKey(0),self,sibling
+        self._insertNonFull(right,key,value,pos - threshold)
+      return True,right.getKey(0),self,right
     else:
       # leaf is not full
       self._insertNonFull(self,key,value,pos)
@@ -196,6 +226,34 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     if self.getKey(pos) == key:
       return self.datas[pos]
     return None
+
+  def removeFromLeaf(self, pos):
+    for i in range(pos, self.getNum()):
+      self.setKeyAndData(i, self.getKeyAndData(i + 1))
+    
+    self.setNum(self.getNum() - 1)
+
+  def rebalance(self):
+    # first try borrow from prev silbing
+    # then  try borrow from next silbing
+    # last try merge with sibling
+    pass
+
+  def remove(self, key):
+    pos = self._findPosition(key)
+    if pos == self.getNum() or self.getKey(pos) != key:
+      return False
+
+    self.removeFromLeaf(pos)
+
+    # if node has enough keys, return
+    if self.isEnough():
+      return True
+
+    # rebalance
+    self.rebalance()
+
+    return True
 
   def traverse(self, result):
     for i in range(0, self.getNum()):
@@ -224,6 +282,9 @@ class BPlusTree(object):
 
   def search(self, key):
     return self.root.search(key)
+
+  def remove(self, key):
+    return self.root.remove(key)
 
   # traverse a btree, return from left to right leaf's key list
   def traverse(self):
