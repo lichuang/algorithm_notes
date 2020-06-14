@@ -20,6 +20,9 @@ class BPlusTreeBaseNode(object):
   def isEnough(self):
     return self.num >= (self.t - 1)
 
+  def canBorrow(self):
+    return self.num >= self.t
+
   def setNext(self, next):
     self.next = next
   
@@ -115,7 +118,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
 
       self.setNext(right)
       right.setPrev(self)
-      
+
       right.setNum(self.getNum() - threshold)
       # copy [t:2t-1] to sibling
       for i in range(0, right.getNum()):
@@ -146,6 +149,145 @@ class BPlusTreeNode(BPlusTreeBaseNode):
     if child == None:
       return None
     return child.search(key)
+
+  # child must not be the first child
+  def changeKey(self, child):
+    for i in range(1, self.getNum() + 1):
+      if self.getChild(i) != child:
+        continue
+
+      key = child.getKey(0)
+      self.setKey(i - 1, key)
+      break 
+
+  # delete child and its previous key
+  def deleteChild(self, child):    
+    pos = 0
+    # first find the location of child
+    for i in range(1, self.getNum() + 1):
+      if self.getChild(i) != child:
+        continue 
+      pos = i
+      break
+    
+    # move key and child one step behind
+    for i in range(pos, self.getNum()):
+      self.setKey(i - 1,  self.getKey(i))
+      self.setChild(i,    self.getChild(i + 1))
+
+    self.setNum(self.getNum() - 1)
+
+  def findPosInParent(self, child):
+    parent = self.getParent()
+    for i in range(1, parent.getNum() + 1):
+      if parent.getChild(i) != child:
+        return i - 1
+
+  def borrowFromPrevSibling(self):
+    pos = self.findPosInParent(self)
+    prev = self.getPrev()
+
+    # move data in self one step ahead
+    self.setChild(self.getNum() + 1, self.getChild(self.getNum()))
+    for i in range(self.getNum() - 1, -1, -1):
+      self.setKeyAndChild(i + 1, self.getKeyAndChild(i))
+
+    # set prev's last child as first child of self
+    self.setChild(0, prev.getChild(prev.getNum()))
+
+    prevLastKey = prev.getKey(prev.getNum() - 1)
+
+    # change number of self and prev
+    self.setNum(self.getNum() + 1)
+    prev.setNum(prev.getNum() - 1)
+    
+    # update parent key
+
+    # move prev old last key as parent.key[pos]
+    key = self.getParent().getKey(pos)
+    self.getParent().setKey(pos,prevLastKey)      
+    # move the key in parent.key[pos] as first key
+    self.setKey(0, key)    
+
+  def borrowFromNextSibling(self):
+    next = self.getNext()
+    pos = self.findPosInParent(next)    
+
+    # move parent.key[pos] as self last key
+    self.setKey(self.getNum(), self.getParent().getKey(pos))
+    # move next first child as self last child
+    self.setChild(self.getNum() + 1, next.getChild(0))
+    # move next first key as parent.key[pos]
+    self.getParent().setKey(pos, next.getKey(0))
+
+    # move data in next one step behind
+    for i in range(1, next.getNum()):
+      next.setKeyAndChild(i - 1, next.getKeyAndChild(i))
+    next.setChild(next.getNum() - 1, next.getChild(next.getNum()))
+
+    # change number of self and next
+    self.setNum(self.getNum() + 1)
+    next.setNum(next.getNum() - 1)
+
+  # merge next to prev and delete next in parent
+  def merge(self, prev, next):
+    assert(prev.getNext() == next)
+    assert(next.getPrev() == prev)
+    pos = self.findPosInParent(next) 
+
+    # move parent.key[pos] as prev last key
+    prev.setKey(prev.getNum(), self.getParent().getKey(pos))
+
+    # move all next data to prev
+    for i in range(next.getNum()):
+      prev.setKeyAndChild(prev.getNum() + i + 1, next.getKeyAndChild(i))
+      
+    prev.setChild(prev.getNum() + next.getNum() + 1, next.getChild(next.getNum()))
+
+    # change number of prev and next
+    prev.setNum(prev.getNum() + next.getNum())       
+    next.setNum(0)
+    prev.setNext(None)
+    next.setPrev(None)
+
+    # delete next in parent
+    self.getParent().deleteInternal(next)
+
+  def rebalance(self):
+    prev = self.getPrev()
+    next = self.getNext()
+
+    if prev and prev.canBorrow():   # first try borrow from prev silbing
+      self.borrowFromPrevSibling()
+    elif next and next.canBorrow(): # then  try borrow from next silbing
+      self.borrowFromNextSibling()
+    else:                           # last try merge with sibling
+      if prev:                      # merge with prev sibling
+        self.merge(prev, self)    
+      else:                         # merge with next sibling
+        self.merge(self, next)
+
+  def deleteInternal(self, child):
+    self.deleteChild(child)
+   
+    if self.isEnough():
+      return
+
+    if not self.getParent():  # if is root?
+      if self.getNum() == 0:
+        self.tree.root = BPlusTreeLeaf(self, None)
+      elif self.getNum() == 1 and self.getChild(1) == None:
+        pass      
+      return
+
+    self.rebalance()
+    
+  def remove(self, key):
+    pos = self._findPosition(key)
+    if pos == len(self.children) or self.getChild(pos) == None:
+      return False
+
+    return self.getChild(pos).remove(key)
 
   def traverse(self, result):
     for i in range(0, self.getNum() + 1):
@@ -228,16 +370,74 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     return None
 
   def removeFromLeaf(self, pos):
-    for i in range(pos, self.getNum()):
+    for i in range(pos, self.getNum() - 1):
       self.setKeyAndData(i, self.getKeyAndData(i + 1))
     
     self.setNum(self.getNum() - 1)
 
+  def borrowFromPrevSibling(self):
+    prev = self.getPrev()
+
+    # move data in self one step ahead
+    for i in range(self.getNum() - 1, -1, -1):
+      self.setKeyAndData(i + 1, self.getKeyAndData(i))
+    # set prev's last data as first data of self
+    self.setKeyAndData(0, prev.getKeyAndData(prev.getNum() - 1))
+    # change number of self and prev
+    self.setNum(self.getNum() + 1)
+    prev.setNum(prev.getNum() - 1)
+    # update parent key
+    if self.getParent():
+      self.getParent().changeKey(self)      
+
+  def borrowFromNextSibling(self):
+    next = self.getNext()
+
+    # set next's first data as last data of self
+    self.setKeyAndData(self.getNum(), next.getKeyAndData(0))
+
+    # move data in next one step behind
+    for i in range(1, next.getNum()):
+      next.setKeyAndData(i - 1, next.getKeyAndData(i))
+
+    # change number of self and next
+    self.setNum(self.getNum() + 1)
+    next.setNum(next.getNum() - 1)
+    # update parent key
+    if self.getParent():
+      self.getParent().changeKey(next)  
+
+  def merge(self, prev, next):
+    next = self.getNext()
+    prevNum = prev.getNum()
+
+    # move next's data to prev
+    for i in range(next.getNum()):
+      prev.setKeyAndData(prevNum + i, next.getKeyAndData(i))
+
+    # change number of self and next
+    prev.setNum(next.getNum() + prevNum)       
+    next.setNum(0)
+
+    prev.setNext(None)
+    next.setPrev(None)
+
+    if self.getParent():
+      self.getParent.deleteInternal(next)
+
   def rebalance(self):
-    # first try borrow from prev silbing
-    # then  try borrow from next silbing
-    # last try merge with sibling
-    pass
+    prev = self.getPrev()
+    next = self.getNext()
+
+    if prev and prev.canBorrow():   # first try borrow from prev silbing
+      self.borrowFromPrevSibling()
+    elif next and next.canBorrow(): # then  try borrow from next silbing
+      self.borrowFromNextSibling()
+    else:                           # last try merge with sibling
+      if prev:                      # merge with prev sibling
+        self.merge(prev, self)    
+      else:                         # merge with next sibling
+        self.merge(self, next)   
 
   def remove(self, key):
     pos = self._findPosition(key)
@@ -292,7 +492,8 @@ class BPlusTree(object):
 
 # unit tests for BPlusTree
 class BPlusTreeTests(unittest.TestCase):
-  def test_additions(self):    
+  def test_additions(self):  
+    return  
     bt = BPlusTree(20)
 
     l = []
@@ -317,7 +518,28 @@ class BPlusTreeTests(unittest.TestCase):
     for i in range(len(result)):
       self.assertEqual(result[i], newList[i])    
 
+  def test_removals(self):
+    bt = BPlusTree(20)
+    l = []
+    for i in range(0,1000):
+      item = random.randint(1,100000)
+      item = i
+      l.append(item)
+      bt.insert(item, item)
+
+    index = random.randint(1,100000) % len(l)
+    item = l[index]
+    l.pop(index)
+
+    bt.remove(item)
+
+    l.sort()
+    result = bt.traverse()
+    for i in range(len(result)):
+        self.assertEqual(result[i], l[i])
+
   def test_search(self):
+    return
     bt = BPlusTree(20)
 
     l = []
