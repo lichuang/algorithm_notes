@@ -492,8 +492,7 @@ class BPlusTree(object):
 
 # unit tests for BPlusTree
 class BPlusTreeTests(unittest.TestCase):
-  def test_additions(self):  
-    return  
+  def test_additions(self):   
     bt = BPlusTree(20)
 
     l = []
@@ -519,11 +518,10 @@ class BPlusTreeTests(unittest.TestCase):
       self.assertEqual(result[i], newList[i])    
 
   def test_removals(self):
-    bt = BPlusTree(20)
+    bt = BPlusTree(2)
     l = []
-    for i in range(0,1000):
+    for i in range(0,50):
       item = random.randint(1,100000)
-      item = i
       l.append(item)
       bt.insert(item, item)
 
@@ -535,11 +533,13 @@ class BPlusTreeTests(unittest.TestCase):
 
     l.sort()
     result = bt.traverse()
+    print 'after remove ', item, ":",l
+    print "traverse bt:", result
+
     for i in range(len(result)):
         self.assertEqual(result[i], l[i])
 
   def test_search(self):
-    return
     bt = BPlusTree(20)
 
     l = []
