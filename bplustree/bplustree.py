@@ -116,9 +116,12 @@ class BPlusTreeNode(BPlusTreeBaseNode):
       threshold = self.t
       right = BPlusTreeNode(self.tree, self.parent)
 
+      if self.getNext():
+        self.getNext().setPrev(right)
+        right.setNext(self.getNext())
       self.setNext(right)
       right.setPrev(self)
-
+      
       right.setNum(self.getNum() - threshold)
       # copy [t:2t-1] to sibling
       for i in range(0, right.getNum()):
@@ -247,8 +250,10 @@ class BPlusTreeNode(BPlusTreeBaseNode):
     # change number of prev and next
     prev.setNum(prev.getNum() + next.getNum())       
     next.setNum(0)
-    prev.setNext(None)
+    prev.setNext(next.getNext())
     next.setPrev(None)
+    if next.getNext():
+      next.getNext().setPrev(prev)
 
     # delete next in parent
     self.getParent().deleteInternal(next)
@@ -289,10 +294,17 @@ class BPlusTreeNode(BPlusTreeBaseNode):
 
     return self.getChild(pos).remove(key)
 
-  def traverse(self, result):
-    for i in range(0, self.getNum() + 1):
+  def traverse(self, result, debug):
+    if debug:
+      keys = "node keys:"
+      for i in range(0, self.getNum()):
+        keys += str(self.getKey(i)) + ","
+      print keys[:-1]
+
+    for i in range(0, self.getNum() + 1):        
       child = self.getChild(i)
-      result = child.traverse(result)
+      result = child.traverse(result, debug)
+
     return result
 
 class BPlusTreeLeaf(BPlusTreeBaseNode):
@@ -341,6 +353,9 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
       threshold = self.t
       right = BPlusTreeLeaf(self.tree, self.parent)
 
+      if self.getNext():
+        self.getNext().setPrev(right)
+        right.setNext(self.getNext())
       self.setNext(right)
       right.setPrev(self)
 
@@ -419,8 +434,10 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
     prev.setNum(next.getNum() + prevNum)       
     next.setNum(0)
 
-    prev.setNext(None)
+    prev.setNext(next.getNext())
     next.setPrev(None)
+    if next.getNext():
+      next.getNext().setPrev(prev)
 
     if self.getParent():
       self.getParent.deleteInternal(next)
@@ -455,9 +472,13 @@ class BPlusTreeLeaf(BPlusTreeBaseNode):
 
     return True
 
-  def traverse(self, result):
+  def traverse(self, result, debug):
+    keys = "leaf keys: "
     for i in range(0, self.getNum()):
+      keys += str(self.getKey(i)) + ","
       result.append(self.getKey(i))
+    if debug:
+      print keys[:-1]
     return result
 
 class BPlusTree(object):
@@ -487,12 +508,12 @@ class BPlusTree(object):
     return self.root.remove(key)
 
   # traverse a btree, return from left to right leaf's key list
-  def traverse(self):
-    return self.root.traverse([])
+  def traverse(self, debug=False):
+    return self.root.traverse([], debug)
 
 # unit tests for BPlusTree
 class BPlusTreeTests(unittest.TestCase):
-  def test_additions(self):   
+  def test_additions(self):       
     bt = BPlusTree(20)
 
     l = []
@@ -517,29 +538,33 @@ class BPlusTreeTests(unittest.TestCase):
     for i in range(len(result)):
       self.assertEqual(result[i], newList[i])    
 
-  def test_removals(self):
+  def test_removals(self):        
     bt = BPlusTree(2)
     l = []
-    for i in range(0,50):
+    dict = {}
+    for i in range(0,2000):
       item = random.randint(1,100000)
+      if item in dict:
+        continue
+      dict[item] = True
       l.append(item)
       bt.insert(item, item)
+
+    #print 'append:', l
 
     index = random.randint(1,100000) % len(l)
     item = l[index]
     l.pop(index)
-
+    #print 'before remove ', item, ":", bt.traverse()
     bt.remove(item)
+    #print 'after remove ', item, ":", bt.traverse()
 
     l.sort()
     result = bt.traverse()
-    print 'after remove ', item, ":",l
-    print "traverse bt:", result
-
     for i in range(len(result)):
         self.assertEqual(result[i], l[i])
 
-  def test_search(self):
+  def test_search(self):    
     bt = BPlusTree(20)
 
     l = []
