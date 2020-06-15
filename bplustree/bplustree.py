@@ -72,6 +72,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
 
   def setChild(self, index, child):
     self.children[index] = child
+    child.setParent(self)
 
   def getKeyAndChild(self, index):
     return self.keys[index],self.children[index]
@@ -80,6 +81,7 @@ class BPlusTreeNode(BPlusTreeBaseNode):
     key, child = packed
     self.keys[index] = key
     self.children[index] = child
+    child.setParent(self)
 
   def _findPosition(self, key):
     i = 0
